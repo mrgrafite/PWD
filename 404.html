@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <title>PWD — redirecionando...</title>
+    <!-- Fallback de SPA para o GitHub Pages (homologação): GH Pages não
+         tem um servidor com try_files como o nginx da VM, então qualquer
+         rota "profunda" (ex.: /pwd/passageiros/novo) cai aqui. Este script
+         reencaminha para o index.html preservando a rota, que é decodificada
+         de volta em index.html. Ver https://github.com/rafgraph/spa-github-pages -->
+    <script type="text/javascript">
+      var pathSegmentsToKeep = 1; // mantém o prefixo "/pwd" do repo
+
+      var l = window.location;
+      l.replace(
+        l.protocol +
+          "//" +
+          l.hostname +
+          (l.port ? ":" + l.port : "") +
+          l.pathname.split("/").slice(0, 1 + pathSegmentsToKeep).join("/") +
+          "/?/" +
+          l.pathname.slice(1).split("/").slice(pathSegmentsToKeep).join("/").replace(/&/g, "~and~") +
+          (l.search ? "&" + l.search.slice(1).replace(/&/g, "~and~") : "") +
+          l.hash
+      );
+    </script>
+  </head>
+  <body></body>
+</html>
