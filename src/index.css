@@ -1,0 +1,523 @@
+/* ==========================================================================
+   PWD — Sistema de Gestão de Passageiros
+   Design tokens e estilos globais (baseado no mockup "PWD Passageiro")
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+
+  --paper: #f4f6f6;
+  --card: #ffffff;
+  --ink: #14201e;
+  --ink-soft: #445350;
+  --ink-faint: #7c8b88;
+  --line: #dde4e2;
+
+  --accent-pwd: #0f8577;
+  --accent-pwd-strong: #0b6e62;
+  --panel-pwd: #e6f3f1;
+
+  --accent-spax: #e0722c;
+  --accent-spax-strong: #b85a20;
+  --panel-spax: #fbeee3;
+
+  --good: #1f9d55;
+  --good-bg: #e8f7ee;
+  --warn: #c98a12;
+  --warn-bg: #fdf3dc;
+  --bad: #c94b3f;
+  --bad-bg: #fbeae8;
+
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(20, 32, 30, .06), 0 4px 14px rgba(20, 32, 30, .05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --paper: #121817;
+    --card: #1a2220;
+    --ink: #eef3f2;
+    --ink-soft: #b7c4c1;
+    --ink-faint: #7c8b88;
+    --line: #2a3432;
+    --panel-pwd: #163430;
+    --panel-spax: #3a2718;
+    --good-bg: #163224;
+    --warn-bg: #33270f;
+    --bad-bg: #331e1c;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+code, .mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+h1, h2, h3, h4 {
+  margin: 0 0 8px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+p { margin: 0 0 10px; line-height: 1.5; }
+
+a { color: var(--accent-pwd-strong); }
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+/* ---- layout do app (sidebar + conteúdo) ---- */
+
+.app-frame {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+/* moldura da sidebar é intencionalmente invariante ao tema — trilho fixo
+   escuro, como a maioria das UIs de produto reais. */
+.sidebar {
+  background: #102b27;
+  color: #dcece8;
+  padding: 18px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 700;
+  font-size: 15px;
+  color: #fff;
+  padding: 0 10px 18px;
+  letter-spacing: .02em;
+}
+
+.sidebar-logo .mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #1f6b64;
+  font-size: 11px;
+}
+
+.navlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.navlist a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: #89a9a1;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.navlist a svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+
+.navlist a:hover { background: rgba(255,255,255,.06); color: #fff; }
+.navlist a.active { background: #1f6b64; color: #fff; }
+
+.sidebar-foot {
+  padding: 14px 10px 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #89a9a1;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.content-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 12px 32px;
+  border-bottom: 1px solid var(--line);
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.user-chip .avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--panel-pwd);
+  color: var(--accent-pwd-strong);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.content {
+  padding: 26px 32px 60px;
+  max-width: 1180px;
+}
+
+.topbar-crumbs {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-bottom: 10px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.page-head .subtitle {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* ---- botões ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+}
+
+.btn.primary {
+  background: var(--accent-pwd);
+  border-color: var(--accent-pwd);
+  color: #fff;
+}
+
+.btn.ghost {
+  background: transparent;
+  border-color: transparent;
+}
+
+/* ---- cartões e seções ---- */
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+
+.section h2 {
+  font-size: 15px;
+  margin-bottom: 14px;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--ink-faint);
+  display: inline-block;
+  margin-top: 6px;
+}
+
+/* ---- formulários ---- */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px 18px;
+}
+
+.field label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin-bottom: 5px;
+}
+
+.field input, .field select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px 10px;
+}
+
+.field input:disabled, .field select:disabled {
+  color: var(--ink-faint);
+  background: var(--line);
+  opacity: .6;
+}
+
+.span-2 { grid-column: span 2; }
+
+/* ---- controle segmentado (ex.: tipo de documento) ---- */
+
+.seg {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.seg button {
+  flex: 1;
+  border: none;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 10px;
+}
+
+.seg button.on {
+  background: var(--accent-pwd);
+  color: #fff;
+}
+
+/* ---- aviso de busca automática (SPax) ---- */
+
+.autolookup {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--panel-pwd);
+  color: var(--accent-pwd-strong);
+  font-size: 12px;
+}
+
+.autolookup svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* ---- dependente / visto (Tela 1) ---- */
+
+.depend-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  margin-bottom: 10px;
+}
+
+.depend-row .who {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.depend-row .meta {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 2px;
+}
+
+.visa-card {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.visa-card .top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.visa-card .who {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.visa-card .meta {
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+.add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-pwd-strong);
+  cursor: pointer;
+}
+
+.inline-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  margin-bottom: 12px;
+}
+
+/* ---- avatar circular (chat, cabeçalhos de pessoa) ---- */
+
+.avatar-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--panel-pwd);
+  color: var(--accent-pwd-strong);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ---- abas ---- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 18px;
+}
+
+.tabs button {
+  background: none;
+  border: none;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  border-bottom: 2px solid transparent;
+}
+
+.tabs button.active {
+  color: var(--accent-pwd-strong);
+  border-bottom-color: var(--accent-pwd);
+}
+
+/* ---- pill / status ---- */
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--panel-pwd);
+  color: var(--accent-pwd-strong);
+}
+
+.pill.on { background: var(--good-bg); color: var(--good); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.off { background: var(--paper); color: var(--ink-faint); }
+
+/* ---- tabelas ---- */
+
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--ink-faint);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.data-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---- callout ---- */
+
+.callout {
+  display: flex;
+  gap: 10px;
+  border-radius: 9px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  margin-bottom: 16px;
+}
+
+.callout.warn { background: var(--warn-bg); color: #7a5a0d; border: 1px solid var(--warn); }
+.callout.good { background: var(--good-bg); color: #16603a; border: 1px solid var(--good); }
