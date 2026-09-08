@@ -135,7 +135,9 @@ export interface EventoIntegracaoSuri {
   id: string;
   tipo: "novo_contato" | "troca_de_fila" | "finalizacao_atendimento" | "mensagem_recebida";
   recebidoEm: string;
-  resumo: string;
+  contato: string;
+  resultado: string;
+  resultadoTipo: "ok" | "flat";
 }
 
 export interface MensagemChat {

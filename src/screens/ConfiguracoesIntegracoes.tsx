@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { eventosSuri } from "../data/mock";
+import { eventosSuri, suriStatus } from "../data/mock";
 
 const ROTULO_EVENTO: Record<string, string> = {
   novo_contato: "Novo contato",
@@ -9,14 +9,17 @@ const ROTULO_EVENTO: Record<string, string> = {
 };
 
 const DESCRICAO_EVENTO: Record<string, string> = {
-  novo_contato: "Cria um Lead no funil de vendas.",
-  troca_de_fila: "Move o card do funil — regra de mapeamento fila↔estágio ainda não definida.",
+  novo_contato: "Cria um Lead no funil de vendas (associa por telefone a um Cliente existente, se houver).",
+  troca_de_fila: "Move o card para o estágio correspondente do funil — regra de mapeamento ainda não definida.",
   finalizacao_atendimento: "Registra uma nota no histórico do Cliente/negociação.",
-  mensagem_recebida: "Atualiza o histórico de conversa vinculado ao Cliente — fonte de dados do chat nativo (Tela 6).",
+  mensagem_recebida: "Atualiza o histórico de conversa do Cliente — fonte de dados do chat nativo (Tela 6).",
 };
 
+const URL_WEBHOOK = "https://pwd.semfronteiras.com.br/api/webhooks/suri";
+
 // Tela 5 — Configurações · Integrações. SPax é nativa (sempre ativa, sem
-// configuração); Suri é de terceiros (token, webhook e eventos assinados).
+// configuração); Suri é de terceiros (credenciais, webhook e eventos
+// assinados).
 export default function ConfiguracoesIntegracoes() {
   const [eventosAtivos, setEventosAtivos] = useState<Record<string, boolean>>({
     novo_contato: true,
@@ -24,9 +27,20 @@ export default function ConfiguracoesIntegracoes() {
     finalizacao_atendimento: true,
     mensagem_recebida: false,
   });
+  const [copiado, setCopiado] = useState(false);
 
   function alternar(chave: string) {
     setEventosAtivos((s) => ({ ...s, [chave]: !s[chave] }));
+  }
+
+  async function copiarWebhook() {
+    try {
+      await navigator.clipboard.writeText(URL_WEBHOOK);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // clipboard indisponível (ex.: contexto não seguro) — sem efeito visível
+    }
   }
 
   return (
@@ -35,87 +49,126 @@ export default function ConfiguracoesIntegracoes() {
       <div className="page-head">
         <div>
           <h1>Integrações</h1>
-          <div className="subtitle">Tela 5</div>
+          <div className="subtitle">Ferramentas externas conectadas ao PWD via API e webhooks</div>
         </div>
       </div>
 
       <div className="section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ margin: 0 }}>SPax</h2>
-          <span className="pill on">Sempre ativo</span>
-        </div>
-        <p style={{ color: "var(--ink-soft)", fontSize: 12.5, marginTop: 8 }}>
-          Reconsulta automática a cada 1 hora · não requer configuração.
-        </p>
-      </div>
-
-      <div className="section">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ margin: 0 }}>Suri</h2>
-          <span className="pill on">Conectado</span>
-        </div>
-
-        <div className="form-grid" style={{ marginTop: 14 }}>
-          <div className="field">
-            <label>Token de API</label>
-            <input readOnly value="sk_live_••••••••••••3f2a" />
-            <span className="hint">Alterar token</span>
-          </div>
-          <div className="field">
-            <label>URL do webhook (cole no Portal Suri)</label>
-            <input readOnly value="https://pwd.seudominio.com.br/api/webhooks/suri" />
-            <span className="hint">A Suri valida com um handshake (GET) antes de começar a enviar eventos.</span>
-          </div>
-        </div>
-
-        <h2 style={{ marginTop: 22, fontSize: 14 }}>Eventos assinados</h2>
-        {Object.keys(ROTULO_EVENTO).map((chave) => (
-          <label
-            key={chave}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "8px 0",
-              borderBottom: "1px solid var(--line)",
-              cursor: "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={eventosAtivos[chave]}
-              onChange={() => alternar(chave)}
-            />
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{ROTULO_EVENTO[chave]}</div>
-              <div style={{ fontSize: 11.5, color: "var(--ink-soft)" }}>{DESCRICAO_EVENTO[chave]}</div>
+        <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--ink-faint)" }}>
+          Integração nativa
+        </h2>
+        <div className="integration-card">
+          <div className="integration-head">
+            <span className="integration-logo spax">SP</span>
+            <div className="txt">
+              <div className="name">SPax — Emissão de bilhetes</div>
+              <div className="desc">Reconsulta automática a cada 1 hora · não requer configuração</div>
             </div>
-          </label>
-        ))}
+            <span className="pill on">Sempre ativo</span>
+          </div>
+        </div>
+      </div>
 
-        <h2 style={{ marginTop: 22, fontSize: 14 }}>Últimos eventos recebidos</h2>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Recebido em</th>
-              <th>Tipo</th>
-              <th>Resumo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {eventosSuri.map((ev) => (
-              <tr key={ev.id}>
-                <td>{ev.recebidoEm}</td>
-                <td>{ROTULO_EVENTO[ev.tipo]}</td>
-                <td>{ev.resumo}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="section">
+        <h2 style={{ fontSize: 13, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--ink-faint)" }}>
+          Ferramentas de terceiros
+        </h2>
+        <div className="integration-card">
+          <div className="integration-head">
+            <span className="integration-logo">SU</span>
+            <div className="txt">
+              <div className="name">Suri — Atendimento via WhatsApp</div>
+              <div className="desc">
+                Conectado desde {suriStatus.conectadoDesde} · último evento recebido {suriStatus.ultimoEventoEm}
+              </div>
+            </div>
+            <span className="pill on">Conectado</span>
+          </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button className="btn">Testar conexão</button>
-          <button className="btn ghost">Desconectar</button>
+          <div className="integration-body">
+            <div style={{ marginBottom: 22 }}>
+              <h2 style={{ fontSize: 14, marginBottom: 12 }}>Credenciais</h2>
+              <div className="form-grid">
+                <div className="field span-2">
+                  <label>Token de API (Suri)</label>
+                  <input className="mono" value="sk_live_••••••••••••3f2a" disabled />
+                </div>
+                <div className="field span-2">
+                  <label>Conectado desde</label>
+                  <input value={suriStatus.conectadoDesde} disabled />
+                </div>
+              </div>
+              <span className="add-link" style={{ marginTop: 8 }}>Alterar token</span>
+            </div>
+
+            <div style={{ marginBottom: 22 }}>
+              <h2 style={{ fontSize: 14, marginBottom: 4 }}>URL do webhook</h2>
+              <p style={{ fontSize: 11.5, color: "var(--ink-faint)", marginBottom: 10 }}>
+                Cole no Portal Suri → Configurações → Geral → Webhook
+              </p>
+              <div className="copy-field">
+                <input className="mono" value={URL_WEBHOOK} disabled />
+                <button className="btn ghost" onClick={copiarWebhook} type="button">
+                  {copiado ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+              <span className="hint">
+                A Suri valida esta URL com um handshake (GET esperando 200 + identificador do chatbot) antes de começar a enviar eventos.
+              </span>
+            </div>
+
+            <div style={{ marginBottom: 22 }}>
+              <h2 style={{ fontSize: 14, marginBottom: 4 }}>Eventos assinados</h2>
+              {Object.keys(ROTULO_EVENTO).map((chave) => (
+                <div className="switch-row" key={chave}>
+                  <div className="txt">
+                    <div className="name">{ROTULO_EVENTO[chave]}</div>
+                    <div className="desc">{DESCRICAO_EVENTO[chave]}</div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={eventosAtivos[chave]}
+                    className={`switch ${eventosAtivos[chave] ? "on" : ""}`}
+                    onClick={() => alternar(chave)}
+                  >
+                    <span className="knob" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <h2 style={{ fontSize: 14, marginBottom: 12 }}>Últimos eventos recebidos</h2>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Recebido em</th>
+                    <th>Evento</th>
+                    <th>Contato</th>
+                    <th>Resultado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {eventosSuri.map((ev) => (
+                    <tr key={ev.id}>
+                      <td className="mono">{ev.recebidoEm}</td>
+                      <td>{ROTULO_EVENTO[ev.tipo]}</td>
+                      <td>{ev.contato}</td>
+                      <td>
+                        <span className={`res-badge ${ev.resultadoTipo}`}>{ev.resultado}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button className="btn ghost">Testar conexão</button>
+              <button className="btn danger-outline">Desconectar</button>
+            </div>
+          </div>
         </div>
       </div>
     </>

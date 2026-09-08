@@ -125,10 +125,17 @@ export const eventosEmbarque: EventoEmbarque[] = [
 ];
 
 export const eventosSuri: EventoIntegracaoSuri[] = [
-  { id: "s1", tipo: "novo_contato", recebidoEm: "08/09/2026 09:05", resumo: "Ricardo Alves Pereira — WhatsApp" },
-  { id: "s2", tipo: "finalizacao_atendimento", recebidoEm: "07/09/2026 18:40", resumo: "Ricardo Alves Pereira — atendimento encerrado" },
-  { id: "s3", tipo: "mensagem_recebida", recebidoEm: "07/09/2026 14:07", resumo: "Ricardo Alves Pereira — nova mensagem" },
+  { id: "s1", tipo: "novo_contato", recebidoEm: "08/09/2026 09:05", contato: "+55 11 98765-2231", resultado: "Lead criado", resultadoTipo: "ok" },
+  { id: "s2", tipo: "finalizacao_atendimento", recebidoEm: "07/09/2026 18:40", contato: "Ricardo Alves Pereira", resultado: "Nota registrada", resultadoTipo: "flat" },
+  { id: "s3", tipo: "novo_contato", recebidoEm: "07/09/2026 14:07", contato: "+55 11 98888-1122", resultado: "Lead criado", resultadoTipo: "ok" },
 ];
+
+// Status estático do card da Suri na Tela 5 — quando houver persistência
+// real isso vem do próprio registro de conexão, não de dados fixos.
+export const suriStatus = {
+  conectadoDesde: "03/09/2026",
+  ultimoEventoEm: "hoje, 09:12",
+};
 
 export const chatRicardo: MensagemChat[] = [
   { id: "m1", direcao: "in", texto: "Oi! Vi o pacote de Cancún de vocês, ainda tem vaga pra outubro?", horario: "14:02", data: "sexta-feira, 5 de setembro de 2026" },

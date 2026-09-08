@@ -15,7 +15,7 @@ import EmConstrucao from "./screens/EmConstrucao";
 // próprio do menu — mesma decisão tomada no mockup e no DPS.
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route element={<AppFrame />}>
           <Route index element={<Navigate to="/passageiros" replace />} />
