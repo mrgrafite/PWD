@@ -1,10 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { chatsPorNegocio, funil } from "../data/mock";
-import type { MensagemChat } from "../types";
+import { apiGet, apiPost } from "../api";
+import type { EstagioFunil } from "../types";
 
-function formatarMoeda(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+interface MensagemChatApi {
+  id: string;
+  direcao: "in" | "out";
+  texto: string;
+  enviadoEm: string;
+}
+
+interface NegocioComMensagens {
+  id: string;
+  clienteNome: string;
+  telefone: string | null;
+  estagio: EstagioFunil;
+  interesse: string | null;
+  valorEstimado: string | null;
+  responsavel: string | null;
+  origemSuri: boolean;
+  mensagens: MensagemChatApi[];
+}
+
+function formatarMoeda(v: string | null) {
+  return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function iniciais(nome: string) {
@@ -12,27 +31,79 @@ function iniciais(nome: string) {
   return ((partes[0]?.[0] ?? "") + (partes[1]?.[0] ?? "")).toUpperCase();
 }
 
+function formatarHorario(iso: string) {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function formatarDiaSeparador(iso: string) {
+  const d = new Date(iso);
+  const hoje = new Date();
+  const dataFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", year: "numeric" }).format(d);
+  if (d.toDateString() === hoje.toDateString()) return `hoje, ${dataFmt}`;
+  const dia = new Intl.DateTimeFormat("pt-BR", { weekday: "long" }).format(d);
+  return `${dia}, ${dataFmt}`;
+}
+
 // Tela 6 — Conversa do Cliente (via Suri). Chat nativo do PWD, aberto como
 // drill-down a partir de um card do funil (Tela 3) — não do menu
-// Configurações. Mensagens saem/entram via API/webhook da Suri; o
-// atendente nunca precisa abrir a Suri (token de serviço único).
+// Configurações. Dados vêm do backend (server/) — GET/POST
+// /api/funil/:id/mensagens — não mais do mock.
+//
+// O envio aqui só persiste no banco (não chama a API de envio da Suri
+// ainda): os contatos de hoje são mocks, não conversas reais do Portal
+// Suri, e enviar de verdade poderia disparar mensagem pra um número real
+// por engano.
 export default function ConversaCliente() {
   const { id } = useParams();
-  const negocio = funil.find((n) => n.id === id) ?? funil[0];
-  const [mensagens, setMensagens] = useState<MensagemChat[]>(chatsPorNegocio[negocio.id] ?? []);
+  const [negocio, setNegocio] = useState<NegocioComMensagens | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-  function enviar() {
-    if (!rascunho.trim()) return;
-    const agora = new Date();
-    const horario = agora.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-    setMensagens((m) => [
-      ...m,
-      { id: `local-${Date.now()}`, direcao: "out", texto: rascunho, horario, data: "hoje" },
-    ]);
-    setRascunho("");
-    // Em produção: chamar a API de envio de mensagens da Suri aqui.
+  useEffect(() => {
+    if (!id) return;
+    setCarregando(true);
+    apiGet<NegocioComMensagens>(`/api/funil/${id}/mensagens`)
+      .then(setNegocio)
+      .catch((e) => setErro(e.message))
+      .finally(() => setCarregando(false));
+  }, [id]);
+
+  // Polling — pega mensagens novas (enviadas OU recebidas, ex.: via webhook
+  // da Suri quando existir) sem precisar recarregar a tela. Só substitui o
+  // estado quando a contagem muda, pra não re-renderizar à toa a cada 3s.
+  useEffect(() => {
+    if (!id) return;
+    const intervalo = setInterval(() => {
+      apiGet<NegocioComMensagens>(`/api/funil/${id}/mensagens`)
+        .then((atualizado) => {
+          setNegocio((atual) => {
+            if (!atual || atualizado.mensagens.length === atual.mensagens.length) return atual;
+            return { ...atual, mensagens: atualizado.mensagens };
+          });
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => clearInterval(intervalo);
+  }, [id]);
+
+  async function enviar() {
+    if (!rascunho.trim() || !negocio || enviando) return;
+    setEnviando(true);
+    try {
+      const mensagem = await apiPost<MensagemChatApi>(`/api/funil/${negocio.id}/mensagens`, { texto: rascunho });
+      setNegocio((n) => (n ? { ...n, mensagens: [...n.mensagens, mensagem] } : n));
+      setRascunho("");
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setEnviando(false);
+    }
   }
+
+  if (carregando) return <p style={{ color: "var(--ink-soft)" }}>Carregando conversa...</p>;
+  if (erro || !negocio) return <p style={{ color: "var(--bad)" }}>Não foi possível carregar a conversa: {erro}</p>;
 
   let diaAnterior = "";
 
@@ -67,19 +138,20 @@ export default function ConversaCliente() {
             </div>
           </div>
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: 18, display: "flex", flexDirection: "column", gap: 10, background: "var(--paper)" }}>
-            {mensagens.length === 0 && (
+            {negocio.mensagens.length === 0 && (
               <div style={{ margin: "auto", fontSize: 12.5, color: "var(--ink-faint)", textAlign: "center" }}>
                 Nenhuma mensagem ainda com este cliente.
               </div>
             )}
-            {mensagens.map((m) => {
-              const mostrarSeparador = m.data !== diaAnterior;
-              diaAnterior = m.data;
+            {negocio.mensagens.map((m) => {
+              const diaLabel = formatarDiaSeparador(m.enviadoEm);
+              const mostrarSeparador = diaLabel !== diaAnterior;
+              diaAnterior = diaLabel;
               return (
                 <div key={m.id} style={{ display: "flex", flexDirection: "column" }}>
                   {mostrarSeparador && (
                     <div style={{ alignSelf: "center", fontSize: 10.5, color: "var(--ink-faint)", background: "var(--card)", border: "1px solid var(--line)", padding: "3px 12px", borderRadius: 99, margin: "4px 0 8px" }}>
-                      {m.data}
+                      {diaLabel}
                     </div>
                   )}
                   <div
@@ -96,7 +168,7 @@ export default function ConversaCliente() {
                   >
                     {m.texto}
                     <span style={{ display: "block", fontSize: 10, marginTop: 4, opacity: 0.65, textAlign: "right" }}>
-                      {m.horario}
+                      {formatarHorario(m.enviadoEm)}
                     </span>
                   </div>
                 </div>
@@ -110,8 +182,11 @@ export default function ConversaCliente() {
               onChange={(e) => setRascunho(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && enviar()}
               placeholder="Digite uma mensagem..."
+              disabled={enviando}
             />
-            <button className="btn primary" onClick={enviar}>Enviar</button>
+            <button className="btn primary" onClick={enviar} disabled={enviando}>
+              {enviando ? "Enviando..." : "Enviar"}
+            </button>
           </div>
           <div style={{ padding: "0 16px 10px", fontSize: 10.5, color: "var(--ink-faint)", background: "var(--card)" }}>
             Mensagens enviadas por aqui são entregues no WhatsApp do cliente via Suri — o atendente nunca precisa abrir a Suri.

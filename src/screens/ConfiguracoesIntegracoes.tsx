@@ -17,6 +17,16 @@ const DESCRICAO_EVENTO: Record<string, string> = {
 
 const URL_WEBHOOK = "https://pwd.semfronteiras.com.br/api/webhooks/suri";
 
+// Backend próprio do PWD (guarda o token da Suri no servidor — nunca no
+// front-end). Em dev local roda em server/ (porta 3001); em homologação/
+// produção precisa apontar pro backend implantado, via VITE_PWD_SERVER_URL.
+const PWD_SERVER_URL = import.meta.env.VITE_PWD_SERVER_URL ?? "http://localhost:3001";
+
+interface TesteConexao {
+  status: "idle" | "carregando" | "ok" | "erro";
+  mensagem?: string;
+}
+
 // Tela 5 — Configurações · Integrações. SPax é nativa (sempre ativa, sem
 // configuração); Suri é de terceiros (credenciais, webhook e eventos
 // assinados).
@@ -28,9 +38,25 @@ export default function ConfiguracoesIntegracoes() {
     mensagem_recebida: false,
   });
   const [copiado, setCopiado] = useState(false);
+  const [teste, setTeste] = useState<TesteConexao>({ status: "idle" });
 
   function alternar(chave: string) {
     setEventosAtivos((s) => ({ ...s, [chave]: !s[chave] }));
+  }
+
+  async function testarConexao() {
+    setTeste({ status: "carregando" });
+    try {
+      const resp = await fetch(`${PWD_SERVER_URL}/api/suri/status`);
+      const data = await resp.json();
+      if (!resp.ok || !data.conectado) {
+        setTeste({ status: "erro", mensagem: data.erro ?? `Backend respondeu ${resp.status}` });
+        return;
+      }
+      setTeste({ status: "ok", mensagem: `${data.nome} · ${data.status} · ambiente ${data.ambiente}` });
+    } catch {
+      setTeste({ status: "erro", mensagem: `Não foi possível alcançar o backend do PWD em ${PWD_SERVER_URL}` });
+    }
   }
 
   async function copiarWebhook() {
@@ -164,9 +190,17 @@ export default function ConfiguracoesIntegracoes() {
               </table>
             </div>
 
-            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-              <button className="btn ghost">Testar conexão</button>
+            <div style={{ display: "flex", gap: 10, marginTop: 18, alignItems: "center", flexWrap: "wrap" }}>
+              <button className="btn ghost" onClick={testarConexao} disabled={teste.status === "carregando"}>
+                {teste.status === "carregando" ? "Testando..." : "Testar conexão"}
+              </button>
               <button className="btn danger-outline">Desconectar</button>
+              {teste.status === "ok" && (
+                <span style={{ fontSize: 12, color: "var(--good)" }}>✓ Conectado — {teste.mensagem}</span>
+              )}
+              {teste.status === "erro" && (
+                <span style={{ fontSize: 12, color: "var(--bad)" }}>✗ {teste.mensagem}</span>
+              )}
             </div>
           </div>
         </div>
