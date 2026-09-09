@@ -57,6 +57,46 @@ function iconeStatus(status: MensagemChatApi["status"]) {
   return <span>✓</span>;
 }
 
+const VELOCIDADES = [1, 1.5, 2] as const;
+
+// O <audio controls> nativo não tem botão de velocidade — soma um botão
+// próprio do lado (cicla 1x/1.5x/2x) mantendo o resto do player nativo
+// (play/pause/progresso/volume).
+function PlayerAudio({ src, corTexto }: { src: string; corTexto: string }) {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [velocidade, setVelocidade] = useState<(typeof VELOCIDADES)[number]>(1);
+
+  function alternarVelocidade() {
+    const proxima = VELOCIDADES[(VELOCIDADES.indexOf(velocidade) + 1) % VELOCIDADES.length];
+    setVelocidade(proxima);
+    if (audioRef.current) audioRef.current.playbackRate = proxima;
+  }
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <audio ref={audioRef} src={src} controls style={{ height: 32, maxWidth: 190 }} />
+      <button
+        type="button"
+        onClick={alternarVelocidade}
+        title="Velocidade de reprodução"
+        style={{
+          fontSize: 10.5,
+          fontWeight: 700,
+          padding: "3px 7px",
+          borderRadius: 99,
+          border: `1px solid ${corTexto}`,
+          background: "transparent",
+          color: corTexto,
+          cursor: "pointer",
+          opacity: 0.85,
+        }}
+      >
+        {velocidade}x
+      </button>
+    </div>
+  );
+}
+
 // Tela 6 — Conversa do Cliente (via Suri). Chat nativo do PWD, aberto como
 // drill-down a partir de um card do funil (Tela 3) — não do menu
 // Configurações. Dados vêm do backend (server/) — GET/POST
@@ -195,7 +235,7 @@ export default function ConversaCliente() {
                     }}
                   >
                     {m.anexoTipo === "audio" && m.anexoUrl ? (
-                      <audio controls src={m.anexoUrl} style={{ display: "block", height: 32, maxWidth: 220 }} />
+                      <PlayerAudio src={m.anexoUrl} corTexto={m.direcao === "out" ? "#eafaf6" : "var(--ink)"} />
                     ) : (
                       m.texto
                     )}
