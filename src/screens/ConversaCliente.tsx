@@ -58,6 +58,7 @@ export default function ConversaCliente() {
   const [negocio, setNegocio] = useState<NegocioComMensagens | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState("");
   const [enviando, setEnviando] = useState(false);
 
@@ -91,12 +92,13 @@ export default function ConversaCliente() {
   async function enviar() {
     if (!rascunho.trim() || !negocio || enviando) return;
     setEnviando(true);
+    setErroEnvio(null);
     try {
       const mensagem = await apiPost<MensagemChatApi>(`/api/funil/${negocio.id}/mensagens`, { texto: rascunho });
       setNegocio((n) => (n ? { ...n, mensagens: [...n.mensagens, mensagem] } : n));
       setRascunho("");
     } catch (e) {
-      setErro((e as Error).message);
+      setErroEnvio((e as Error).message);
     } finally {
       setEnviando(false);
     }
@@ -175,6 +177,11 @@ export default function ConversaCliente() {
               );
             })}
           </div>
+          {erroEnvio && (
+            <div style={{ padding: "8px 16px", fontSize: 11.5, color: "var(--bad)", background: "var(--bad-bg)", borderTop: "1px solid var(--line)" }}>
+              Não foi possível enviar: {erroEnvio}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
             <input
               style={{ flex: 1, fontSize: 13, borderRadius: 99, padding: "9px 16px", border: "1px solid var(--line)", background: "var(--paper)" }}
