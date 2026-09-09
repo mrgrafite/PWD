@@ -74,7 +74,7 @@ function PlayerAudio({ src, corTexto }: { src: string; corTexto: string }) {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <audio ref={audioRef} src={src} controls style={{ height: 32, maxWidth: 190 }} />
+      <audio ref={audioRef} src={src} controls style={{ height: 36, width: 280 }} />
       <button
         type="button"
         onClick={alternarVelocidade}
@@ -224,7 +224,7 @@ export default function ConversaCliente() {
                   )}
                   <div
                     style={{
-                      maxWidth: "68%",
+                      maxWidth: m.anexoTipo === "audio" ? 340 : "68%",
                       alignSelf: m.direcao === "out" ? "flex-end" : "flex-start",
                       background: m.direcao === "out" ? "var(--accent-pwd)" : "var(--card)",
                       color: m.direcao === "out" ? "#eafaf6" : "var(--ink)",
