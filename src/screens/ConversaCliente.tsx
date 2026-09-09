@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 const SeletorEmoji = lazy(() => import("../components/SeletorEmoji"));
-import { apiGet, apiPost, apiUpload } from "../api";
+import { apiGet, apiPatch, apiPost, apiUpload } from "../api";
 import type { EstagioFunil } from "../types";
 
 interface MensagemChatApi {
@@ -16,6 +16,13 @@ interface MensagemChatApi {
   anexoNome?: string | null;
 }
 
+interface EstagioLogApi {
+  id: string;
+  estagioAnterior: EstagioFunil;
+  estagioNovo: EstagioFunil;
+  alteradoEm: string;
+}
+
 interface NegocioComMensagens {
   id: string;
   clienteNome: string;
@@ -26,7 +33,16 @@ interface NegocioComMensagens {
   responsavel: string | null;
   origemSuri: boolean;
   mensagens: MensagemChatApi[];
+  historicoEstagio: EstagioLogApi[];
 }
+
+const ROTULO_ESTAGIO: Record<EstagioFunil, string> = {
+  lead: "Lead",
+  orcamento: "Orçamento",
+  negociacao: "Negociação",
+  ganho: "Ganho",
+  perdido: "Perdido",
+};
 
 function formatarMoeda(v: string | null) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -39,6 +55,12 @@ function iniciais(nome: string) {
 
 function formatarHorario(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function formatarDataHoraCurta(iso: string) {
+  const d = new Date(iso);
+  const data = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return `${data} ${formatarHorario(iso)}`;
 }
 
 function formatarTempoGravacao(segundos: number) {
@@ -169,6 +191,15 @@ export default function ConversaCliente() {
   // próximo render) — evita mandar a mesma mensagem duas vezes se o
   // usuário der Enter e clicar em Enviar quase ao mesmo tempo.
   const enviandoRef = useRef(false);
+
+  // null = nenhuma alteração pendente (o <select> reflete negocio.estagio
+  // direto, inclusive quando o polling traz uma mudança feita em outro
+  // lugar); só vira not-null quando o atendente mexe no combo, e volta a
+  // null depois de salvar — é isso que faz o botão "Salvar" só aparecer
+  // quando há de fato uma mudança não gravada ainda.
+  const [estagioSelecionado, setEstagioSelecionado] = useState<EstagioFunil | null>(null);
+  const [salvandoEstagio, setSalvandoEstagio] = useState(false);
+  const [erroEstagio, setErroEstagio] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -316,6 +347,26 @@ export default function ConversaCliente() {
       setErroEnvio((e as Error).message);
     } finally {
       setEnviandoAnexo(false);
+    }
+  }
+
+  // Grava a mudança de estágio (o backend cria a linha de histórico
+  // atomicamente junto com o update) e recarrega o negócio inteiro em
+  // seguida, em vez de só atualizar o campo local — assim o histórico
+  // exibido no painel já sai atualizado, sem esperar o próximo polling.
+  async function salvarEstagio() {
+    if (!negocio || !estagioSelecionado || estagioSelecionado === negocio.estagio) return;
+    setSalvandoEstagio(true);
+    setErroEstagio(null);
+    try {
+      await apiPatch(`/api/funil/${negocio.id}/estagio`, { estagio: estagioSelecionado });
+      const completo = await apiGet<NegocioComMensagens>(`/api/funil/${negocio.id}/mensagens`);
+      setNegocio(completo);
+      setEstagioSelecionado(null);
+    } catch (e) {
+      setErroEstagio((e as Error).message);
+    } finally {
+      setSalvandoEstagio(false);
     }
   }
 
@@ -514,13 +565,31 @@ export default function ConversaCliente() {
             <label className="mono" style={{ display: "block", fontSize: 10, textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 5 }}>
               Estágio do funil
             </label>
-            <select defaultValue={negocio.estagio} style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--line)" }}>
+            <select
+              value={estagioSelecionado ?? negocio.estagio}
+              onChange={(e) => setEstagioSelecionado(e.target.value as EstagioFunil)}
+              disabled={salvandoEstagio}
+              style={{ width: "100%", padding: "8px 10px", borderRadius: 7, border: "1px solid var(--line)" }}
+            >
               <option value="lead">Lead</option>
               <option value="orcamento">Orçamento</option>
               <option value="negociacao">Negociação</option>
               <option value="ganho">Ganho</option>
               <option value="perdido">Perdido</option>
             </select>
+            {estagioSelecionado !== null && estagioSelecionado !== negocio.estagio && (
+              <button
+                className="btn primary"
+                onClick={salvarEstagio}
+                disabled={salvandoEstagio}
+                style={{ marginTop: 8, width: "100%" }}
+              >
+                {salvandoEstagio ? "Salvando..." : "Salvar novo estágio"}
+              </button>
+            )}
+            {erroEstagio && (
+              <div style={{ marginTop: 6, fontSize: 11, color: "var(--bad)" }}>{erroEstagio}</div>
+            )}
           </div>
           <div style={{ marginBottom: 14 }}>
             <label className="mono" style={{ display: "block", fontSize: 10, textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 5 }}>
@@ -540,6 +609,24 @@ export default function ConversaCliente() {
             </label>
             <div>{negocio.responsavel}</div>
           </div>
+          {negocio.historicoEstagio.length > 0 && (
+            <div style={{ marginBottom: 14 }}>
+              <label className="mono" style={{ display: "block", fontSize: 10, textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 5 }}>
+                Histórico do funil
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {negocio.historicoEstagio.map((h) => (
+                  <div key={h.id} style={{ fontSize: 11.5 }}>
+                    <span className="mono" style={{ color: "var(--ink-faint)", fontSize: 10.5 }}>
+                      {formatarDataHoraCurta(h.alteradoEm)}
+                    </span>
+                    <br />
+                    {ROTULO_ESTAGIO[h.estagioAnterior]} → <strong>{ROTULO_ESTAGIO[h.estagioNovo]}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <Link to="/vendas" style={{ fontSize: 12.5 }}>Ver no funil de vendas →</Link>
         </div>
       </div>

@@ -24,6 +24,10 @@ export function apiPost<T>(path: string, body: unknown) {
   return api<T>(path, { method: "POST", body: JSON.stringify(body) });
 }
 
+export function apiPatch<T>(path: string, body: unknown) {
+  return api<T>(path, { method: "PATCH", body: JSON.stringify(body) });
+}
+
 // Upload de arquivo (multipart/form-data) — sem Content-Type manual, o
 // navegador define o boundary sozinho. Usado pra envio de áudio gravado.
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
