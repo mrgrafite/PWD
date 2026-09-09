@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { apiGet } from "../api";
 import type { EstagioFunil } from "../types";
 
+type StatusAtendimento = "roxo" | "vermelho" | "verde" | "amarelo" | null;
+
 interface NegocioFunilApi {
   id: string;
   clienteNome: string;
@@ -10,6 +12,7 @@ interface NegocioFunilApi {
   interesse: string | null;
   valorEstimado: string | null;
   origemSuri: boolean;
+  statusAtendimento: StatusAtendimento;
 }
 
 const COLUNAS: { estagio: EstagioFunil; titulo: string }[] = [
@@ -19,6 +22,19 @@ const COLUNAS: { estagio: EstagioFunil; titulo: string }[] = [
   { estagio: "ganho", titulo: "Ganho" },
   { estagio: "perdido", titulo: "Perdido" },
 ];
+
+const LEGENDA_STATUS: { status: Exclude<StatusAtendimento, null>; rotulo: string }[] = [
+  { status: "vermelho", rotulo: "Conversa ativa — cliente aguardando resposta" },
+  { status: "verde", rotulo: "Respondido há pouco (< 5min)" },
+  { status: "amarelo", rotulo: "Respondido há 5min+ sem retorno do cliente" },
+  { status: "roxo", rotulo: "Lead novo, ainda não atendido" },
+];
+
+// Intervalo do polling: o status é derivado de tempo decorrido (ex.: verde
+// vira amarelo aos 5min), então precisa recalcular periodicamente mesmo sem
+// nenhuma mensagem nova — 20s é frequente o bastante pra sentir "ao vivo"
+// sem sobrecarregar o backend.
+const INTERVALO_POLLING_MS = 20_000;
 
 function formatarMoeda(v: string | null) {
   return (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,10 +51,15 @@ export default function FunilVendas() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    apiGet<NegocioFunilApi[]>("/api/funil")
-      .then(setNegocios)
-      .catch((e) => setErro(e.message))
-      .finally(() => setCarregando(false));
+    const carregar = () =>
+      apiGet<NegocioFunilApi[]>("/api/funil")
+        .then(setNegocios)
+        .catch((e) => setErro(e.message))
+        .finally(() => setCarregando(false));
+
+    carregar();
+    const intervalo = setInterval(carregar, INTERVALO_POLLING_MS);
+    return () => clearInterval(intervalo);
   }, []);
 
   return (
@@ -50,6 +71,17 @@ export default function FunilVendas() {
           <div className="subtitle">Tela 3 — clique em um card para abrir a conversa do cliente</div>
         </div>
       </div>
+
+      {!carregando && !erro && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 18px", marginBottom: 16, fontSize: 12, color: "var(--ink-soft)" }}>
+          {LEGENDA_STATUS.map((l) => (
+            <div key={l.status} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span className={`status-atendimento ${l.status}`} />
+              {l.rotulo}
+            </div>
+          ))}
+        </div>
+      )}
 
       {carregando && <p style={{ color: "var(--ink-soft)" }}>Carregando...</p>}
       {erro && <p style={{ color: "var(--bad)" }}>Não foi possível carregar o funil: {erro}</p>}
@@ -71,7 +103,10 @@ export default function FunilVendas() {
                       style={{ padding: "12px 14px", cursor: "pointer" }}
                       onClick={() => navigate(`/vendas/${n.id}/conversa`)}
                     >
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{n.clienteNome}</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 600, fontSize: 13 }}>
+                        {n.statusAtendimento && <span className={`status-atendimento ${n.statusAtendimento}`} />}
+                        {n.clienteNome}
+                      </div>
                       <div style={{ fontSize: 12, color: "var(--ink-soft)", margin: "4px 0 8px" }}>
                         {n.interesse}
                       </div>
