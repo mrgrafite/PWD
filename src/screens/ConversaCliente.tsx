@@ -6,9 +6,11 @@ import type { EstagioFunil } from "../types";
 interface MensagemChatApi {
   id: string;
   direcao: "in" | "out";
-  texto: string;
+  texto: string | null;
   enviadoEm: string;
   status?: "enviada" | "entregue" | "lida" | "erro" | null;
+  anexoTipo?: string | null;
+  anexoUrl?: string | null;
 }
 
 interface NegocioComMensagens {
@@ -192,7 +194,11 @@ export default function ConversaCliente() {
                       fontSize: 12.5,
                     }}
                   >
-                    {m.texto}
+                    {m.anexoTipo === "audio" && m.anexoUrl ? (
+                      <audio controls src={m.anexoUrl} style={{ display: "block", height: 32, maxWidth: 220 }} />
+                    ) : (
+                      m.texto
+                    )}
                     <span style={{ display: "flex", justifyContent: "flex-end", gap: 4, fontSize: 10, marginTop: 4, opacity: 0.85 }}>
                       {formatarHorario(m.enviadoEm)}
                       {m.direcao === "out" && iconeStatus(m.status)}
