@@ -13,6 +13,7 @@ interface MensagemChatApi {
   status?: "enviada" | "entregue" | "lida" | "erro" | null;
   anexoTipo?: string | null;
   anexoUrl?: string | null;
+  anexoNome?: string | null;
 }
 
 interface NegocioComMensagens {
@@ -103,6 +104,48 @@ function PlayerAudio({ src, corTexto }: { src: string; corTexto: string }) {
         {velocidade}x
       </button>
     </div>
+  );
+}
+
+// Ícone de documento genérico (PDF, Word, etc.) — usado no card de anexo
+// que não é imagem/vídeo/áudio, já que não dá pra tocar/exibir inline.
+function IconeDocumento({ cor }: { cor: string }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+    </svg>
+  );
+}
+
+// Renderiza qualquer anexo que não seja áudio (que já tem o PlayerAudio):
+// imagem abre inline (clicável pra abrir em nova aba, resolução real),
+// vídeo com controles nativos, e documento (PDF, Word etc.) como um
+// cartão clicável com nome do arquivo — a Suri manda tudo já num link
+// público, então "abrir" aqui é só um <a target="_blank">.
+function Anexo({ tipo, url, nome, corTexto }: { tipo: string; url: string; nome: string | null | undefined; corTexto: string }) {
+  if (tipo === "image") {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <img src={url} alt={nome ?? "Imagem enviada"} style={{ maxWidth: 260, maxHeight: 260, borderRadius: 8, display: "block" }} />
+      </a>
+    );
+  }
+  if (tipo === "video") {
+    return <video src={url} controls style={{ maxWidth: 260, borderRadius: 8, display: "block" }} />;
+  }
+  // "document" e qualquer outro tipo não previsto caem aqui — sempre dá
+  // pra abrir o link, mesmo sem saber o tipo exato.
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ display: "flex", alignItems: "center", gap: 8, color: corTexto, textDecoration: "none" }}
+    >
+      <IconeDocumento cor={corTexto} />
+      <span style={{ wordBreak: "break-word" }}>{nome ?? "Abrir anexo"}</span>
+    </a>
   );
 }
 
@@ -257,6 +300,25 @@ export default function ConversaCliente() {
     }
   }
 
+  const [enviandoAnexo, setEnviandoAnexo] = useState(false);
+  const anexoInputRef = useRef<HTMLInputElement>(null);
+
+  async function enviarAnexo(arquivo: File) {
+    if (!negocio) return;
+    setEnviandoAnexo(true);
+    setErroEnvio(null);
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", arquivo);
+      const mensagem = await apiUpload<MensagemChatApi>(`/api/funil/${negocio.id}/anexo`, formData);
+      setNegocio((n) => (n ? { ...n, mensagens: [...n.mensagens, mensagem] } : n));
+    } catch (e) {
+      setErroEnvio((e as Error).message);
+    } finally {
+      setEnviandoAnexo(false);
+    }
+  }
+
   if (carregando) return <p style={{ color: "var(--ink-soft)" }}>Carregando conversa...</p>;
   if (erro || !negocio) return <p style={{ color: "var(--bad)" }}>Não foi possível carregar a conversa: {erro}</p>;
 
@@ -311,7 +373,7 @@ export default function ConversaCliente() {
                   )}
                   <div
                     style={{
-                      maxWidth: m.anexoTipo === "audio" ? 340 : "68%",
+                      maxWidth: m.anexoTipo ? 340 : "68%",
                       alignSelf: m.direcao === "out" ? "flex-end" : "flex-start",
                       background: m.direcao === "out" ? "var(--accent-pwd)" : "var(--card)",
                       color: m.direcao === "out" ? "#eafaf6" : "var(--ink)",
@@ -323,6 +385,8 @@ export default function ConversaCliente() {
                   >
                     {m.anexoTipo === "audio" && m.anexoUrl ? (
                       <PlayerAudio src={m.anexoUrl} corTexto={m.direcao === "out" ? "#eafaf6" : "var(--ink)"} />
+                    ) : m.anexoTipo && m.anexoUrl ? (
+                      <Anexo tipo={m.anexoTipo} url={m.anexoUrl} nome={m.anexoNome} corTexto={m.direcao === "out" ? "#eafaf6" : "var(--ink)"} />
                     ) : (
                       m.texto
                     )}
@@ -362,7 +426,7 @@ export default function ConversaCliente() {
                 <button
                   className="btn ghost"
                   onClick={() => setMostrarEmojis((v) => !v)}
-                  disabled={enviando || enviandoAudio}
+                  disabled={enviando || enviandoAudio || enviandoAnexo}
                   title="Emojis"
                   style={{ padding: "8px 10px" }}
                 >
@@ -373,18 +437,43 @@ export default function ConversaCliente() {
                   </svg>
                 </button>
                 <input
+                  ref={anexoInputRef}
+                  type="file"
+                  hidden
+                  onChange={(e) => {
+                    const arquivo = e.target.files?.[0];
+                    e.target.value = ""; // permite escolher o mesmo arquivo de novo em seguida
+                    if (arquivo) enviarAnexo(arquivo);
+                  }}
+                />
+                <button
+                  className="btn ghost"
+                  onClick={() => anexoInputRef.current?.click()}
+                  disabled={enviando || enviandoAudio || enviandoAnexo}
+                  title="Anexar arquivo"
+                  style={{ padding: "8px 10px" }}
+                >
+                  {enviandoAnexo ? (
+                    "…"
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3.5 3.5 0 0 1 4.95 4.95l-9.19 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  )}
+                </button>
+                <input
                   ref={inputRef}
                   style={{ flex: 1, fontSize: 13, borderRadius: 99, padding: "9px 16px", border: "1px solid var(--line)", background: "var(--paper)" }}
                   value={rascunho}
                   onChange={(e) => setRascunho(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && enviar()}
                   placeholder="Digite uma mensagem..."
-                  disabled={enviando || enviandoAudio}
+                  disabled={enviando || enviandoAudio || enviandoAnexo}
                 />
                 <button
                   className="btn ghost"
                   onClick={iniciarGravacao}
-                  disabled={enviando || enviandoAudio}
+                  disabled={enviando || enviandoAudio || enviandoAnexo}
                   title="Gravar áudio"
                   style={{ padding: "8px 10px" }}
                 >
@@ -399,7 +488,7 @@ export default function ConversaCliente() {
                     </svg>
                   )}
                 </button>
-                <button className="btn primary" onClick={enviar} disabled={enviando || enviandoAudio}>
+                <button className="btn primary" onClick={enviar} disabled={enviando || enviandoAudio || enviandoAnexo}>
                   {enviando ? "Enviando..." : "Enviar"}
                 </button>
               </>
