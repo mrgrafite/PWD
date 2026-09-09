@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+
+const SeletorEmoji = lazy(() => import("../components/SeletorEmoji"));
 import { apiGet, apiPost, apiUpload } from "../api";
 import type { EstagioFunil } from "../types";
 
@@ -65,27 +67,6 @@ function iconeStatus(status: MensagemChatApi["status"]) {
 
 const VELOCIDADES = [1, 1.5, 2] as const;
 
-// Seleção enxuta, focada no que um atendente de agência de viagens usa no
-// dia a dia — evita puxar uma biblioteca de ~1MB só pra ter o catálogo
-// completo de emojis.
-const EMOJIS: { grupo: string; itens: string[] }[] = [
-  {
-    grupo: "Rostos",
-    itens: ["😀", "😃", "😄", "😁", "😅", "😂", "🙂", "😉", "😊", "😍", "🥰", "😘", "🤗", "🤔", "😌", "😎", "🥳", "😢", "😭", "😡", "🙄", "😴"],
-  },
-  {
-    grupo: "Gestos",
-    itens: ["👍", "👎", "👌", "🙏", "👏", "🤝", "✌️", "💪", "👋", "🫶"],
-  },
-  {
-    grupo: "Status",
-    itens: ["✅", "❌", "⚠️", "❤️", "🔥", "⭐", "🎉", "💰", "💳", "📅", "📌", "⏰", "📞", "📱", "✉️", "📎", "🔗", "📄"],
-  },
-  {
-    grupo: "Viagem",
-    itens: ["✈️", "🧳", "🎫", "🛂", "🏨", "🏖️", "🏝️", "🌴", "🗺️", "🌎", "🚌", "🚗", "🛳️", "☀️", "🌙", "📸"],
-  },
-];
 
 // O <audio controls> nativo não tem botão de velocidade — soma um botão
 // próprio do lado (cicla 1x/1.5x/2x) mantendo o resto do player nativo
@@ -360,26 +341,10 @@ export default function ConversaCliente() {
             </div>
           )}
           {mostrarEmojis && !gravando && (
-            <div style={{ maxHeight: 190, overflowY: "auto", padding: "10px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
-              {EMOJIS.map((cat) => (
-                <div key={cat.grupo} style={{ marginBottom: 8 }}>
-                  <div className="mono" style={{ fontSize: 9.5, textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 4 }}>
-                    {cat.grupo}
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                    {cat.itens.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => inserirEmoji(emoji)}
-                        style={{ fontSize: 19, lineHeight: 1, padding: "4px 5px", border: "none", background: "transparent", borderRadius: 6 }}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div style={{ borderTop: "1px solid var(--line)" }}>
+              <Suspense fallback={<div style={{ padding: 16, fontSize: 12, color: "var(--ink-faint)" }}>Carregando emojis...</div>}>
+                <SeletorEmoji onSelecionar={inserirEmoji} />
+              </Suspense>
             </div>
           )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
