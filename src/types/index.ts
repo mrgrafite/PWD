@@ -131,9 +131,19 @@ export interface EventoEmbarque {
   destino: string;
 }
 
+export type TipoEventoSuri =
+  | "novo_contato"
+  | "troca_de_fila"
+  | "finalizacao_atendimento"
+  | "mensagem_recebida"
+  | "mensagem_enviada"
+  | "falha_envio"
+  | "mensagem_lida"
+  | "mensagem_entregue";
+
 export interface EventoIntegracaoSuri {
   id: string;
-  tipo: "novo_contato" | "troca_de_fila" | "finalizacao_atendimento" | "mensagem_recebida";
+  tipo: TipoEventoSuri;
   recebidoEm: string;
   contato: string;
   resultado: string;

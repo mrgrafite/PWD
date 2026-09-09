@@ -6,6 +6,10 @@ const ROTULO_EVENTO: Record<string, string> = {
   troca_de_fila: "Troca de fila",
   finalizacao_atendimento: "Finalização de atendimento",
   mensagem_recebida: "Mensagem recebida",
+  mensagem_enviada: "Mensagem enviada",
+  falha_envio: "Falha no envio",
+  mensagem_lida: "Mensagem lida",
+  mensagem_entregue: "Mensagem entregue",
 };
 
 const DESCRICAO_EVENTO: Record<string, string> = {
@@ -13,14 +17,22 @@ const DESCRICAO_EVENTO: Record<string, string> = {
   troca_de_fila: "Move o card para o estágio correspondente do funil — regra de mapeamento ainda não definida.",
   finalizacao_atendimento: "Registra uma nota no histórico do Cliente/negociação.",
   mensagem_recebida: "Atualiza o histórico de conversa do Cliente — fonte de dados do chat nativo (Tela 6).",
+  mensagem_enviada: "Confirma que uma mensagem enviada pelo PWD chegou na Suri (auditoria).",
+  falha_envio: "Alerta quando uma mensagem enviada pelo PWD falha na entrega via Suri.",
+  mensagem_lida: "Confirma que o cliente leu a mensagem (recibo de leitura do WhatsApp).",
+  mensagem_entregue: "Confirma que a mensagem chegou no WhatsApp do cliente (antes da leitura).",
 };
-
-const URL_WEBHOOK = "https://pwd.semfronteiras.com.br/api/webhooks/suri";
 
 // Backend próprio do PWD (guarda o token da Suri no servidor — nunca no
 // front-end). Em dev local roda em server/ (porta 3001); em homologação/
 // produção precisa apontar pro backend implantado, via VITE_PWD_SERVER_URL.
 const PWD_SERVER_URL = import.meta.env.VITE_PWD_SERVER_URL ?? "http://localhost:3001";
+
+// URL real do webhook receptor (server/src/index.ts) — nunca hardcode um
+// domínio fixo aqui, tem que refletir o backend de verdade configurado
+// acima, senão o que aparece pra colar no Portal Suri não bate com o que
+// está implantado.
+const URL_WEBHOOK = `${PWD_SERVER_URL}/api/webhooks/suri`;
 
 interface TesteConexao {
   status: "idle" | "carregando" | "ok" | "erro";
@@ -33,9 +45,13 @@ interface TesteConexao {
 export default function ConfiguracoesIntegracoes() {
   const [eventosAtivos, setEventosAtivos] = useState<Record<string, boolean>>({
     novo_contato: true,
-    troca_de_fila: false,
+    troca_de_fila: true,
     finalizacao_atendimento: true,
-    mensagem_recebida: false,
+    mensagem_recebida: true,
+    mensagem_enviada: true,
+    falha_envio: true,
+    mensagem_lida: true,
+    mensagem_entregue: true,
   });
   const [copiado, setCopiado] = useState(false);
   const [teste, setTeste] = useState<TesteConexao>({ status: "idle" });
