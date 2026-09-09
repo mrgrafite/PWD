@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { apiGet, apiPost } from "../api";
+import { apiGet, apiPost, apiUpload } from "../api";
 import type { EstagioFunil } from "../types";
 
 interface MensagemChatApi {
@@ -36,6 +36,12 @@ function iniciais(nome: string) {
 
 function formatarHorario(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function formatarTempoGravacao(segundos: number) {
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
 }
 
 function formatarDiaSeparador(iso: string) {
@@ -102,10 +108,9 @@ function PlayerAudio({ src, corTexto }: { src: string; corTexto: string }) {
 // Configurações. Dados vêm do backend (server/) — GET/POST
 // /api/funil/:id/mensagens — não mais do mock.
 //
-// O envio aqui só persiste no banco (não chama a API de envio da Suri
-// ainda): os contatos de hoje são mocks, não conversas reais do Portal
-// Suri, e enviar de verdade poderia disparar mensagem pra um número real
-// por engano.
+// Envio de texto e áudio chamam a API real de envio da Suri no backend
+// (server/) — a mensagem só fica salva aqui depois de confirmado que
+// chegou lá.
 export default function ConversaCliente() {
   const { id } = useParams();
   const [negocio, setNegocio] = useState<NegocioComMensagens | null>(null);
@@ -167,6 +172,70 @@ export default function ConversaCliente() {
     } finally {
       enviandoRef.current = false;
       setEnviando(false);
+    }
+  }
+
+  const [gravando, setGravando] = useState(false);
+  const [tempoGravacao, setTempoGravacao] = useState(0);
+  const [enviandoAudio, setEnviandoAudio] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function iniciarGravacao() {
+    setErroEnvio(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        enviarAudio(blob);
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setGravando(true);
+      setTempoGravacao(0);
+      timerRef.current = setInterval(() => setTempoGravacao((t) => t + 1), 1000);
+    } catch {
+      setErroEnvio("Não foi possível acessar o microfone — verifique a permissão do navegador.");
+    }
+  }
+
+  function pararGravacao() {
+    mediaRecorderRef.current?.stop();
+    setGravando(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  function cancelarGravacao() {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.onstop = () => {
+        mediaRecorderRef.current?.stream.getTracks().forEach((t) => t.stop());
+      };
+      mediaRecorderRef.current.stop();
+    }
+    setGravando(false);
+    if (timerRef.current) clearInterval(timerRef.current);
+  }
+
+  async function enviarAudio(blob: Blob) {
+    if (!negocio) return;
+    setEnviandoAudio(true);
+    setErroEnvio(null);
+    try {
+      const formData = new FormData();
+      formData.append("audio", blob, "audio.webm");
+      const mensagem = await apiUpload<MensagemChatApi>(`/api/funil/${negocio.id}/audio`, formData);
+      setNegocio((n) => (n ? { ...n, mensagens: [...n.mensagens, mensagem] } : n));
+    } catch (e) {
+      setErroEnvio((e as Error).message);
+    } finally {
+      setEnviandoAudio(false);
     }
   }
 
@@ -254,17 +323,48 @@ export default function ConversaCliente() {
             </div>
           )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
-            <input
-              style={{ flex: 1, fontSize: 13, borderRadius: 99, padding: "9px 16px", border: "1px solid var(--line)", background: "var(--paper)" }}
-              value={rascunho}
-              onChange={(e) => setRascunho(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && enviar()}
-              placeholder="Digite uma mensagem..."
-              disabled={enviando}
-            />
-            <button className="btn primary" onClick={enviar} disabled={enviando}>
-              {enviando ? "Enviando..." : "Enviar"}
-            </button>
+            {gravando ? (
+              <>
+                <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--bad)", flexShrink: 0, animation: "pulse-gravando 1s ease-in-out infinite" }} />
+                <span style={{ flex: 1, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                  Gravando... {formatarTempoGravacao(tempoGravacao)}
+                </span>
+                <button className="btn ghost" onClick={cancelarGravacao} title="Cancelar gravação">✕</button>
+                <button className="btn primary" onClick={pararGravacao}>Parar e enviar</button>
+              </>
+            ) : (
+              <>
+                <input
+                  style={{ flex: 1, fontSize: 13, borderRadius: 99, padding: "9px 16px", border: "1px solid var(--line)", background: "var(--paper)" }}
+                  value={rascunho}
+                  onChange={(e) => setRascunho(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && enviar()}
+                  placeholder="Digite uma mensagem..."
+                  disabled={enviando || enviandoAudio}
+                />
+                <button
+                  className="btn ghost"
+                  onClick={iniciarGravacao}
+                  disabled={enviando || enviandoAudio}
+                  title="Gravar áudio"
+                  style={{ padding: "8px 10px" }}
+                >
+                  {enviandoAudio ? (
+                    "…"
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="3" width="6" height="11" rx="3" />
+                      <path d="M5 11a7 7 0 0 0 14 0" />
+                      <path d="M12 18v3" />
+                      <path d="M9 21h6" />
+                    </svg>
+                  )}
+                </button>
+                <button className="btn primary" onClick={enviar} disabled={enviando || enviandoAudio}>
+                  {enviando ? "Enviando..." : "Enviar"}
+                </button>
+              </>
+            )}
           </div>
           <div style={{ padding: "0 16px 10px", fontSize: 10.5, color: "var(--ink-faint)", background: "var(--card)" }}>
             Mensagens enviadas por aqui são entregues no WhatsApp do cliente via Suri — o atendente nunca precisa abrir a Suri.
