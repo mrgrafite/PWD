@@ -65,6 +65,28 @@ function iconeStatus(status: MensagemChatApi["status"]) {
 
 const VELOCIDADES = [1, 1.5, 2] as const;
 
+// Seleção enxuta, focada no que um atendente de agência de viagens usa no
+// dia a dia — evita puxar uma biblioteca de ~1MB só pra ter o catálogo
+// completo de emojis.
+const EMOJIS: { grupo: string; itens: string[] }[] = [
+  {
+    grupo: "Rostos",
+    itens: ["😀", "😃", "😄", "😁", "😅", "😂", "🙂", "😉", "😊", "😍", "🥰", "😘", "🤗", "🤔", "😌", "😎", "🥳", "😢", "😭", "😡", "🙄", "😴"],
+  },
+  {
+    grupo: "Gestos",
+    itens: ["👍", "👎", "👌", "🙏", "👏", "🤝", "✌️", "💪", "👋", "🫶"],
+  },
+  {
+    grupo: "Status",
+    itens: ["✅", "❌", "⚠️", "❤️", "🔥", "⭐", "🎉", "💰", "💳", "📅", "📌", "⏰", "📞", "📱", "✉️", "📎", "🔗", "📄"],
+  },
+  {
+    grupo: "Viagem",
+    itens: ["✈️", "🧳", "🎫", "🛂", "🏨", "🏖️", "🏝️", "🌴", "🗺️", "🌎", "🚌", "🚗", "🛳️", "☀️", "🌙", "📸"],
+  },
+];
+
 // O <audio controls> nativo não tem botão de velocidade — soma um botão
 // próprio do lado (cicla 1x/1.5x/2x) mantendo o resto do player nativo
 // (play/pause/progresso/volume).
@@ -178,6 +200,21 @@ export default function ConversaCliente() {
   const [gravando, setGravando] = useState(false);
   const [tempoGravacao, setTempoGravacao] = useState(0);
   const [enviandoAudio, setEnviandoAudio] = useState(false);
+  const [mostrarEmojis, setMostrarEmojis] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Insere no ponto onde o cursor está, não só no fim — o atendente pode
+  // ter voltado pra corrigir algo no meio da frase.
+  function inserirEmoji(emoji: string) {
+    const input = inputRef.current;
+    const pos = input?.selectionStart ?? rascunho.length;
+    setRascunho(rascunho.slice(0, pos) + emoji + rascunho.slice(pos));
+    setMostrarEmojis(false);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(pos + emoji.length, pos + emoji.length);
+    });
+  }
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -322,6 +359,29 @@ export default function ConversaCliente() {
               Não foi possível enviar: {erroEnvio}
             </div>
           )}
+          {mostrarEmojis && !gravando && (
+            <div style={{ maxHeight: 190, overflowY: "auto", padding: "10px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
+              {EMOJIS.map((cat) => (
+                <div key={cat.grupo} style={{ marginBottom: 8 }}>
+                  <div className="mono" style={{ fontSize: 9.5, textTransform: "uppercase", color: "var(--ink-faint)", marginBottom: 4 }}>
+                    {cat.grupo}
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                    {cat.itens.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => inserirEmoji(emoji)}
+                        style={{ fontSize: 19, lineHeight: 1, padding: "4px 5px", border: "none", background: "transparent", borderRadius: 6 }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "12px 16px", borderTop: "1px solid var(--line)", background: "var(--card)" }}>
             {gravando ? (
               <>
@@ -334,7 +394,21 @@ export default function ConversaCliente() {
               </>
             ) : (
               <>
+                <button
+                  className="btn ghost"
+                  onClick={() => setMostrarEmojis((v) => !v)}
+                  disabled={enviando || enviandoAudio}
+                  title="Emojis"
+                  style={{ padding: "8px 10px" }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M8.5 14.5a4.5 4.5 0 0 0 7 0" />
+                    <path d="M9 9.5h.01M15 9.5h.01" />
+                  </svg>
+                </button>
                 <input
+                  ref={inputRef}
                   style={{ flex: 1, fontSize: 13, borderRadius: 99, padding: "9px 16px", border: "1px solid var(--line)", background: "var(--paper)" }}
                   value={rascunho}
                   onChange={(e) => setRascunho(e.target.value)}
