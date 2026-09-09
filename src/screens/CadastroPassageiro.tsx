@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { clientes, grupos } from "../data/mock";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { apiGet, apiPost, apiUpload } from "../api";
 import type { TipoDocumentoNacional, TipoPassaporte } from "../types";
 
 type Aba = "titular" | "familia" | "passaporte" | "visto";
@@ -18,6 +19,26 @@ interface DependenteForm {
   nome: string;
   parentesco: string;
   nascimento: string;
+  cpf: string;
+}
+
+interface ClienteApi {
+  id: string;
+  nomeRazaoSocial: string;
+}
+
+interface GrupoApi {
+  id: string;
+  nome: string;
+}
+
+// Estado de navegação vindo do botão "Adicionar ao cadastro de
+// passageiro" na Tela 6 (Conversa do Cliente) — pré-preenche o que já se
+// sabe do contato pelo chat, sem obrigar o atendente a redigitar.
+interface PreenchimentoDoChat {
+  nome?: string;
+  telefone?: string;
+  clienteId?: string;
 }
 
 interface VistoForm {
@@ -54,27 +75,55 @@ const UFS = [
 // para edição manual se a consulta falhar (ou se o atendente pedir, no
 // caso de endereço atípico).
 export default function CadastroPassageiro() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [aba, setAba] = useState<Aba>("titular");
   const [endereco, setEndereco] = useState<EnderecoForm>(ENDERECO_VAZIO);
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [cepErro, setCepErro] = useState(false);
 
-  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumentoNacional>("RG");
+  // Pré-preenchimento vindo do botão "Adicionar ao cadastro de passageiro"
+  // na Tela 6 — inicializa o estado direto (em vez de um useEffect à
+  // parte) porque só precisa rodar uma vez, no primeiro render.
+  const preenchimento = location.state as PreenchimentoDoChat | null;
+  const [nome, setNome] = useState(preenchimento?.nome ?? "");
+  const [cpf, setCpf] = useState("");
+  const [dataNascimento, setDataNascimento] = useState("");
+  const [telefoneWhatsapp, setTelefoneWhatsapp] = useState(preenchimento?.telefone ?? "");
+  const [clienteId, setClienteId] = useState(preenchimento?.clienteId ?? "");
+  const [grupoId, setGrupoId] = useState("");
+  const [clientesApi, setClientesApi] = useState<ClienteApi[]>([]);
+  const [gruposApi, setGruposApi] = useState<GrupoApi[]>([]);
 
-  // Dependentes e vistos são simplificados aqui como listas locais do
-  // formulário (nome/data + país/tipo/número). No modelo real cada
-  // dependente é um Passageiro completo (titularId) com endereço, documento,
-  // passaporte e visto próprios — a edição completa por dependente fica
-  // para quando o cadastro tiver persistência real.
+  useEffect(() => {
+    apiGet<ClienteApi[]>("/api/clientes").then(setClientesApi).catch(() => {});
+    apiGet<GrupoApi[]>("/api/grupos").then(setGruposApi).catch(() => {});
+  }, []);
+
+  const [tipoDocumento, setTipoDocumento] = useState<TipoDocumentoNacional>("RG");
+  const [docNumero, setDocNumero] = useState("");
+  const [docOrgaoEmissor, setDocOrgaoEmissor] = useState("");
+  const [docCategoriaCnh, setDocCategoriaCnh] = useState("");
+
+  // Dependentes e vistos são listas locais do formulário até o momento de
+  // salvar — no modelo real cada dependente vira outra linha de Passageiro
+  // (titularId apontando pro titular, mesmo clienteId), e cada visto vira
+  // uma linha da tabela visto ligada ao titular.
   const [dependentes, setDependentes] = useState<DependenteForm[]>([]);
-  const [novoDependente, setNovoDependente] = useState<{ nome: string; parentesco: string; nascimento: string } | null>(null);
+  const [novoDependente, setNovoDependente] = useState<{ nome: string; parentesco: string; nascimento: string; cpf: string } | null>(null);
 
   const [vistos, setVistos] = useState<VistoForm[]>([]);
   const [novoVisto, setNovoVisto] = useState<{ pais: string; tipo: string; numero: string; dataEmissao: string; validade: string } | null>(null);
 
   const [tipoPassaporte, setTipoPassaporte] = useState<TipoPassaporte>("regular");
+  const [passaporteNumero, setPassaporteNumero] = useState("");
+  const [passaporteNumeroControle, setPassaporteNumeroControle] = useState("");
+  const [passaportePaisEmissor, setPassaportePaisEmissor] = useState("");
+  const [passaporteValidade, setPassaporteValidade] = useState("");
   const [fotoFrente, setFotoFrente] = useState<string | null>(null);
   const [fotoVerso, setFotoVerso] = useState<string | null>(null);
+  const [enviandoFoto, setEnviandoFoto] = useState<"frente" | "verso" | null>(null);
 
   const [estadoPassaporte, setEstadoPassaporte] = useState("");
   const [cidadePassaporte, setCidadePassaporte] = useState("");
@@ -85,6 +134,85 @@ export default function CadastroPassageiro() {
   const [cidadeDocumento, setCidadeDocumento] = useState("");
   const [cidadesDocumento, setCidadesDocumento] = useState<string[]>([]);
   const [carregandoCidadesDocumento, setCarregandoCidadesDocumento] = useState(false);
+
+  const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null);
+
+  async function enviarFoto(arquivo: File, lado: "frente" | "verso") {
+    setEnviandoFoto(lado);
+    try {
+      const formData = new FormData();
+      formData.append("arquivo", arquivo);
+      const { url } = await apiUpload<{ url: string }>("/api/upload", formData);
+      if (lado === "frente") setFotoFrente(url);
+      else setFotoVerso(url);
+    } catch {
+      // silencioso — o campo fica vazio e o atendente pode tentar de novo
+    } finally {
+      setEnviandoFoto(null);
+    }
+  }
+
+  async function salvar() {
+    if (!nome.trim() || !cpf.trim()) {
+      setErroSalvar(!nome.trim() ? "Nome completo é obrigatório" : "CPF é obrigatório");
+      setAba("titular");
+      return;
+    }
+    setSalvando(true);
+    setErroSalvar(null);
+    try {
+      await apiPost<{ id: string }>("/api/passageiros", {
+        nomeCompleto: nome.trim(),
+        cpf: cpf.trim(),
+        dataNascimento: dataNascimento || null,
+        telefoneWhatsapp: telefoneWhatsapp || null,
+        clienteId: clienteId || null,
+        grupoId: grupoId || null,
+        cep: endereco.cep || null,
+        logradouro: endereco.logradouro || null,
+        bairro: endereco.bairro || null,
+        cidade: endereco.cidade || null,
+        estado: endereco.estado || null,
+        paisResidencia: endereco.paisResidencia || null,
+        docTipo: tipoDocumento,
+        docNumero: docNumero || null,
+        docOrgaoEmissor: docOrgaoEmissor || null,
+        docUfEmissor: estadoDocumento || null,
+        docCidadeEmissora: cidadeDocumento || null,
+        docCategoriaCnh: tipoDocumento === "CNH" ? docCategoriaCnh || null : null,
+        passaporte: {
+          tipo: tipoPassaporte,
+          numero: passaporteNumero || null,
+          numeroControle: passaporteNumeroControle || null,
+          paisEmissor: passaportePaisEmissor || null,
+          cidadeEmissao: cidadePassaporte || null,
+          estadoEmissao: estadoPassaporte || null,
+          validade: passaporteValidade || null,
+          fotoFrente,
+          fotoVerso,
+        },
+        vistos: vistos.map((v) => ({
+          pais: v.pais,
+          tipo: v.tipo,
+          numero: v.numero || null,
+          dataEmissao: v.dataEmissao || null,
+          validade: v.validade || null,
+        })),
+        dependentes: dependentes.map((d) => ({
+          nome: d.nome,
+          parentesco: d.parentesco || null,
+          nascimento: d.nascimento || null,
+          cpf: d.cpf || null,
+        })),
+      });
+      navigate("/passageiros");
+    } catch (e) {
+      setErroSalvar((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   async function carregarMunicipios(uf: string, setCidades: (v: string[]) => void, setCarregando: (v: boolean) => void) {
     setCidades([]);
@@ -155,9 +283,12 @@ export default function CadastroPassageiro() {
           <h1>Cadastro do Passageiro</h1>
           <div className="subtitle">Tela 1 — CPF é a chave de busca; dispara a busca automática da reserva no SPax</div>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button className="btn ghost">Cancelar</button>
-          <button className="btn primary">Salvar passageiro</button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {erroSalvar && <span style={{ fontSize: 12, color: "var(--bad)" }}>{erroSalvar}</span>}
+          <button className="btn ghost" onClick={() => navigate(-1)} disabled={salvando}>Cancelar</button>
+          <button className="btn primary" onClick={salvar} disabled={salvando}>
+            {salvando ? "Salvando..." : "Salvar passageiro"}
+          </button>
         </div>
       </div>
 
@@ -178,34 +309,38 @@ export default function CadastroPassageiro() {
           <div className="form-grid">
             <div className="field span-2">
               <label>Nome completo</label>
-              <input placeholder="Nome do passageiro" />
+              <input placeholder="Nome do passageiro" value={nome} onChange={(e) => setNome(e.target.value)} />
             </div>
             <div className="field">
               <label>CPF</label>
-              <input className="mono" placeholder="000.000.000-00" />
+              <input className="mono" placeholder="000.000.000-00" value={cpf} onChange={(e) => setCpf(e.target.value)} />
             </div>
             <div className="field">
               <label>Data de nascimento</label>
-              <input type="date" />
+              <input type="date" value={dataNascimento} onChange={(e) => setDataNascimento(e.target.value)} />
             </div>
             <div className="field span-2">
               <label>Telefone / WhatsApp</label>
-              <input placeholder="+55 (11) 90000-0000" />
+              <input
+                placeholder="+55 (11) 90000-0000"
+                value={telefoneWhatsapp}
+                onChange={(e) => setTelefoneWhatsapp(e.target.value)}
+              />
             </div>
             <div className="field">
               <label>Cliente (conta)</label>
-              <select defaultValue="">
-                <option value="" disabled>Selecione...</option>
-                {clientes.map((c) => (
+              <select value={clienteId} onChange={(e) => setClienteId(e.target.value)}>
+                <option value="">Selecione...</option>
+                {clientesApi.map((c) => (
                   <option key={c.id} value={c.id}>{c.nomeRazaoSocial}</option>
                 ))}
               </select>
             </div>
             <div className="field">
               <label>Grupo / Excursão</label>
-              <select defaultValue="">
+              <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)}>
                 <option value="">Nenhum</option>
-                {grupos.map((g) => (
+                {gruposApi.map((g) => (
                   <option key={g.id} value={g.id}>{g.nome}</option>
                 ))}
               </select>
@@ -282,11 +417,11 @@ export default function CadastroPassageiro() {
             </div>
             <div className="field">
               <label>Número</label>
-              <input className="mono" />
+              <input className="mono" value={docNumero} onChange={(e) => setDocNumero(e.target.value)} />
             </div>
             <div className="field">
               <label>Órgão emissor</label>
-              <input placeholder="SSP" />
+              <input placeholder="SSP" value={docOrgaoEmissor} onChange={(e) => setDocOrgaoEmissor(e.target.value)} />
             </div>
             <div className="field">
               <label>Estado emissor</label>
@@ -314,7 +449,12 @@ export default function CadastroPassageiro() {
             </div>
             <div className="field">
               <label>Categoria (CNH)</label>
-              <input placeholder="—" disabled={tipoDocumento !== "CNH"} />
+              <input
+                placeholder="—"
+                disabled={tipoDocumento !== "CNH"}
+                value={docCategoriaCnh}
+                onChange={(e) => setDocCategoriaCnh(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -333,7 +473,8 @@ export default function CadastroPassageiro() {
               <div>
                 <div className="who">{d.nome || "Dependente sem nome"}</div>
                 <div className="meta">
-                  {d.parentesco || "parentesco não informado"} · nascido em {d.nascimento || "—"} · mesmo endereço do titular
+                  {d.parentesco || "parentesco não informado"} · nascido em {d.nascimento || "—"}
+                  {d.cpf && <> · CPF {d.cpf}</>} · mesmo endereço do titular
                 </div>
               </div>
               <button className="btn ghost" onClick={() => setDependentes((list) => list.filter((x) => x.id !== d.id))}>
@@ -361,6 +502,10 @@ export default function CadastroPassageiro() {
                 <label>Data de nascimento</label>
                 <input type="date" value={novoDependente.nascimento} onChange={(e) => setNovoDependente({ ...novoDependente, nascimento: e.target.value })} />
               </div>
+              <div className="field">
+                <label>CPF (se tiver)</label>
+                <input className="mono" value={novoDependente.cpf} onChange={(e) => setNovoDependente({ ...novoDependente, cpf: e.target.value })} />
+              </div>
               <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
                 <button
                   className="btn primary"
@@ -376,7 +521,7 @@ export default function CadastroPassageiro() {
               </div>
             </div>
           ) : (
-            <span className="add-link" onClick={() => setNovoDependente({ nome: "", parentesco: "", nascimento: "" })}>
+            <span className="add-link" onClick={() => setNovoDependente({ nome: "", parentesco: "", nascimento: "", cpf: "" })}>
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
               Adicionar dependente
             </span>
@@ -399,15 +544,15 @@ export default function CadastroPassageiro() {
             </div>
             <div className="field">
               <label>Número</label>
-              <input className="mono" />
+              <input className="mono" value={passaporteNumero} onChange={(e) => setPassaporteNumero(e.target.value)} />
             </div>
             <div className="field">
               <label>Número de controle</label>
-              <input className="mono" />
+              <input className="mono" value={passaporteNumeroControle} onChange={(e) => setPassaporteNumeroControle(e.target.value)} />
             </div>
             <div className="field">
               <label>País emissor</label>
-              <input />
+              <input value={passaportePaisEmissor} onChange={(e) => setPassaportePaisEmissor(e.target.value)} />
             </div>
             <div className="field">
               <label>Estado de emissão</label>
@@ -435,25 +580,35 @@ export default function CadastroPassageiro() {
             </div>
             <div className="field">
               <label>Validade</label>
-              <input type="date" />
+              <input type="date" value={passaporteValidade} onChange={(e) => setPassaporteValidade(e.target.value)} />
             </div>
             <div className="field">
               <label>Foto do passaporte — frente</label>
               <input
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(e) => setFotoFrente(e.target.files?.[0]?.name ?? null)}
+                disabled={enviandoFoto === "frente"}
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) enviarFoto(arquivo, "frente");
+                }}
               />
-              {fotoFrente && <span className="hint">{fotoFrente}</span>}
+              {enviandoFoto === "frente" && <span className="hint">Enviando...</span>}
+              {fotoFrente && enviandoFoto !== "frente" && <span className="hint">Arquivo enviado ✓</span>}
             </div>
             <div className="field">
               <label>Foto do passaporte — verso</label>
               <input
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(e) => setFotoVerso(e.target.files?.[0]?.name ?? null)}
+                disabled={enviandoFoto === "verso"}
+                onChange={(e) => {
+                  const arquivo = e.target.files?.[0];
+                  if (arquivo) enviarFoto(arquivo, "verso");
+                }}
               />
-              {fotoVerso && <span className="hint">{fotoVerso}</span>}
+              {enviandoFoto === "verso" && <span className="hint">Enviando...</span>}
+              {fotoVerso && enviandoFoto !== "verso" && <span className="hint">Arquivo enviado ✓</span>}
             </div>
           </div>
         </div>

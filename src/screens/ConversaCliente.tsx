@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 
 const SeletorEmoji = lazy(() => import("../components/SeletorEmoji"));
 import { apiGet, apiPatch, apiPost, apiUpload } from "../api";
@@ -25,6 +25,7 @@ interface EstagioLogApi {
 
 interface NegocioComMensagens {
   id: string;
+  clienteId: string | null;
   clienteNome: string;
   telefone: string | null;
   estagio: EstagioFunil;
@@ -181,6 +182,7 @@ function Anexo({ tipo, url, nome, corTexto }: { tipo: string; url: string; nome:
 // chegou lá.
 export default function ConversaCliente() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [negocio, setNegocio] = useState<NegocioComMensagens | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -627,6 +629,17 @@ export default function ConversaCliente() {
               </div>
             </div>
           )}
+          <button
+            className="btn ghost"
+            style={{ width: "100%", marginBottom: 10 }}
+            onClick={() =>
+              navigate("/passageiros/novo", {
+                state: { nome: negocio.clienteNome, telefone: negocio.telefone ?? undefined, clienteId: negocio.clienteId ?? undefined },
+              })
+            }
+          >
+            + Adicionar ao cadastro de passageiro
+          </button>
           <Link to="/vendas" style={{ fontSize: 12.5 }}>Ver no funil de vendas →</Link>
         </div>
       </div>
