@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { apiGet, apiPost } from "../api";
 import type { EstagioFunil } from "../types";
@@ -8,6 +8,7 @@ interface MensagemChatApi {
   direcao: "in" | "out";
   texto: string;
   enviadoEm: string;
+  status?: "enviada" | "entregue" | "lida" | "erro" | null;
 }
 
 interface NegocioComMensagens {
@@ -44,6 +45,16 @@ function formatarDiaSeparador(iso: string) {
   return `${dia}, ${dataFmt}`;
 }
 
+// ✓ enviada, ✓✓ entregue, ✓✓ azul lida — convenção do próprio WhatsApp,
+// só faz sentido pra mensagens "out" (as "in" não têm status de leitura
+// do nosso lado).
+function iconeStatus(status: MensagemChatApi["status"]) {
+  if (status === "lida") return <span style={{ color: "#53bdeb" }}>✓✓</span>;
+  if (status === "entregue") return <span>✓✓</span>;
+  if (status === "erro") return <span style={{ color: "var(--bad)" }}>!</span>;
+  return <span>✓</span>;
+}
+
 // Tela 6 — Conversa do Cliente (via Suri). Chat nativo do PWD, aberto como
 // drill-down a partir de um card do funil (Tela 3) — não do menu
 // Configurações. Dados vêm do backend (server/) — GET/POST
@@ -61,6 +72,10 @@ export default function ConversaCliente() {
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const [rascunho, setRascunho] = useState("");
   const [enviando, setEnviando] = useState(false);
+  // Trava síncrona (além do estado "enviando", que só reflete na tela no
+  // próximo render) — evita mandar a mesma mensagem duas vezes se o
+  // usuário der Enter e clicar em Enviar quase ao mesmo tempo.
+  const enviandoRef = useRef(false);
 
   useEffect(() => {
     if (!id) return;
@@ -71,16 +86,21 @@ export default function ConversaCliente() {
       .finally(() => setCarregando(false));
   }, [id]);
 
-  // Polling — pega mensagens novas (enviadas OU recebidas, ex.: via webhook
-  // da Suri quando existir) sem precisar recarregar a tela. Só substitui o
-  // estado quando a contagem muda, pra não re-renderizar à toa a cada 3s.
+  // Polling — pega mensagens novas (enviadas OU recebidas) e também
+  // atualizações de status (entregue/lida) de mensagens já existentes, sem
+  // precisar recarregar a tela. Compara um "retrato" simples (id+status de
+  // cada mensagem) pra só re-renderizar quando algo realmente mudou —
+  // importante com o chat aberto em mais de um computador ao mesmo tempo.
   useEffect(() => {
     if (!id) return;
     const intervalo = setInterval(() => {
       apiGet<NegocioComMensagens>(`/api/funil/${id}/mensagens`)
         .then((atualizado) => {
           setNegocio((atual) => {
-            if (!atual || atualizado.mensagens.length === atual.mensagens.length) return atual;
+            if (!atual) return atual;
+            const retratoAtual = atual.mensagens.map((m) => `${m.id}:${m.status}`).join(",");
+            const retratoNovo = atualizado.mensagens.map((m) => `${m.id}:${m.status}`).join(",");
+            if (retratoAtual === retratoNovo) return atual;
             return { ...atual, mensagens: atualizado.mensagens };
           });
         })
@@ -90,16 +110,20 @@ export default function ConversaCliente() {
   }, [id]);
 
   async function enviar() {
-    if (!rascunho.trim() || !negocio || enviando) return;
+    if (!rascunho.trim() || !negocio || enviandoRef.current) return;
+    enviandoRef.current = true;
     setEnviando(true);
     setErroEnvio(null);
+    const texto = rascunho;
+    setRascunho("");
     try {
-      const mensagem = await apiPost<MensagemChatApi>(`/api/funil/${negocio.id}/mensagens`, { texto: rascunho });
+      const mensagem = await apiPost<MensagemChatApi>(`/api/funil/${negocio.id}/mensagens`, { texto });
       setNegocio((n) => (n ? { ...n, mensagens: [...n.mensagens, mensagem] } : n));
-      setRascunho("");
     } catch (e) {
       setErroEnvio((e as Error).message);
+      setRascunho(texto); // devolve o texto pro campo — o envio falhou, o usuário não perde o que escreveu
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }
@@ -169,8 +193,9 @@ export default function ConversaCliente() {
                     }}
                   >
                     {m.texto}
-                    <span style={{ display: "block", fontSize: 10, marginTop: 4, opacity: 0.65, textAlign: "right" }}>
+                    <span style={{ display: "flex", justifyContent: "flex-end", gap: 4, fontSize: 10, marginTop: 4, opacity: 0.85 }}>
                       {formatarHorario(m.enviadoEm)}
+                      {m.direcao === "out" && iconeStatus(m.status)}
                     </span>
                   </div>
                 </div>
