@@ -5,6 +5,20 @@
 
 @import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
+/* Identidade visual ALI Tecnologia (reference_ali_identidade_visual) — usada
+   nas telas já migradas (login, mockups de validação); resto do app segue
+   IBM Plex Sans até a migração completa ser confirmada. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,wght@1,400;1,500&display=swap');
+
+:root {
+  --ali-petrol-green: #315D59;
+  --ali-deep-forest: #173F38;
+  --ali-forest-black: #0E211D;
+  --ali-terracotta: #9A6048;
+  --ali-warm-camel: #B78A61;
+  --ali-warm-ivory: #F2EEE5;
+  --ali-sand: #D8C5AA;
+}
 
 :root {
   color-scheme: light;
@@ -674,8 +688,8 @@ table.data-table {
 }
 
 .login-brand {
-  background: #102b27;
-  color: #dcece8;
+  background: var(--ali-deep-forest);
+  color: var(--ali-warm-ivory);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -685,41 +699,35 @@ table.data-table {
 .login-brand .mark-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-family: "IBM Plex Mono", monospace;
+  gap: 10px;
+  font-family: "Archivo", sans-serif;
   font-weight: 700;
   font-size: 15px;
-  color: #fff;
-}
-
-.login-brand .mark-row .mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  background: #1f6b64;
-  font-size: 11px;
+  color: var(--ali-warm-ivory);
 }
 
 .login-brand .pitch h1 {
+  font-family: "Archivo", sans-serif;
+  font-weight: 600;
   font-size: 30px;
   line-height: 1.2;
-  color: #fff;
+  color: var(--ali-warm-ivory);
   max-width: 22rem;
 }
 
 .login-brand .pitch p {
-  color: #89a9a1;
-  font-size: 13.5px;
+  font-family: "Newsreader", serif;
+  font-style: italic;
+  color: var(--ali-sand);
+  font-size: 14.5px;
   max-width: 24rem;
 }
 
 .login-brand .foot {
+  font-family: "Archivo", sans-serif;
   font-size: 11.5px;
-  color: #6f8d85;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(242, 238, 229, 0.55);
+  border-top: 1px solid rgba(242, 238, 229, 0.14);
   padding-top: 14px;
 }
 
@@ -728,25 +736,28 @@ table.data-table {
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: var(--paper);
+  background: var(--ali-warm-ivory);
 }
 
 .login-card {
   width: 100%;
   max-width: 360px;
-  background: var(--card);
-  border: 1px solid var(--line);
+  background: #ffffff;
+  border: 1px solid rgba(49, 93, 89, 0.14);
   border-radius: 14px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 1px 2px rgba(14, 33, 29, .06), 0 4px 14px rgba(14, 33, 29, .08);
   padding: 30px 28px 26px;
 }
 
 .login-card h2 {
+  font-family: "Archivo", sans-serif;
+  font-weight: 600;
+  color: var(--ali-forest-black);
   font-size: 19px;
 }
 
 .login-card .sub {
-  color: var(--ink-soft);
+  color: var(--ali-petrol-green);
   font-size: 12.5px;
   margin-bottom: 20px;
 }
@@ -757,11 +768,33 @@ table.data-table {
   gap: 14px;
 }
 
+.login-card .field label {
+  color: var(--ali-forest-black);
+}
+
+.login-card .field input {
+  background: var(--ali-warm-ivory);
+  border-color: rgba(49, 93, 89, 0.2);
+}
+
+.login-card .field input:focus {
+  outline: none;
+  border-color: var(--ali-petrol-green);
+  box-shadow: 0 0 0 3px rgba(49, 93, 89, 0.15);
+}
+
 .login-card .btn.primary {
   width: 100%;
   justify-content: center;
   padding: 10px 14px;
   margin-top: 4px;
+  background: var(--ali-petrol-green);
+  border-color: var(--ali-petrol-green);
+}
+
+.login-card .btn.primary:hover {
+  background: var(--ali-deep-forest);
+  border-color: var(--ali-deep-forest);
 }
 
 .login-error {

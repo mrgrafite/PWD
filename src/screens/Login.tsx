@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiPost } from "../api";
 import { salvarSessao, type Sessao } from "../auth";
+import AliMark from "../components/AliMark";
 
 // Tela real de login (rollout item 3 do design doc de multi-tenant) —
 // substitui o placeholder "sign-in-demo" (nunca chamava a API de verdade).
@@ -40,7 +41,7 @@ export default function Login() {
     <div className="login-shell">
       <aside className="login-brand">
         <div className="mark-row">
-          <span className="mark">PW</span> PWD
+          <AliMark size={28} /> PWD
         </div>
         <div className="pitch">
           <h1>Gestão de passageiros, do primeiro contato ao embarque.</h1>

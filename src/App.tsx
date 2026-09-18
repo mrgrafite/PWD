@@ -11,6 +11,7 @@ import ConversaCliente from "./screens/ConversaCliente";
 import EmConstrucao from "./screens/EmConstrucao";
 import Login from "./screens/Login";
 import SignInDemo from "./screens/SignInDemo";
+import InteractiveSelectorDemo from "./screens/InteractiveSelectorDemo";
 
 // Seis telas do mockup "PWD Passageiro", portadas para componentes React.
 // Rotas espelham o menu lateral (Passageiros / Vendas / Agenda / Configurações);
@@ -22,6 +23,7 @@ export default function App() {
       <Routes>
         <Route path="login" element={<Login />} />
         <Route path="sign-in-demo" element={<SignInDemo />} />
+        <Route path="interactive-selector-demo" element={<InteractiveSelectorDemo />} />
         <Route element={<RotaProtegida />}>
           <Route element={<AppFrame />}>
             <Route index element={<Navigate to="/passageiros" replace />} />
