@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { lerSessao, limparSessao } from "../auth";
 
 const NAV = [
   {
@@ -79,7 +80,22 @@ const NAV = [
 // Moldura do app: sidebar fixa (menu, sempre visível) + coluna de conteúdo
 // com topbar (chip do usuário logado). Espelha o chrome do mockup "PWD
 // Passageiro" em todas as 6 telas.
+function iniciaisDe(nome: string) {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const ultima = partes.length > 1 ? partes[partes.length - 1][0] : "";
+  return (primeira + ultima).toUpperCase() || "?";
+}
+
 export default function AppFrame() {
+  const navigate = useNavigate();
+  const sessao = lerSessao();
+
+  function sair() {
+    limparSessao();
+    navigate("/login", { replace: true });
+  }
+
   return (
     <div className="app-frame">
       <nav className="sidebar">
@@ -97,7 +113,7 @@ export default function AppFrame() {
           ))}
         </ul>
         <div className="sidebar-foot">
-          Sem Fronteiras Turismo
+          {sessao?.tenantSlug ?? "—"}
           <br />
           ambiente: produção
         </div>
@@ -106,8 +122,12 @@ export default function AppFrame() {
       <div className="content-col">
         <div className="topbar">
           <div className="user-chip">
-            <span className="avatar">MS</span> Marcelo Santos
+            <span className="avatar">{iniciaisDe(sessao?.usuario.nome ?? "?")}</span>
+            {sessao?.usuario.nome ?? "Usuário"}
           </div>
+          <button type="button" className="btn" onClick={sair} style={{ marginInlineStart: 12 }}>
+            Sair
+          </button>
         </div>
         <div className="content">
           <Outlet />

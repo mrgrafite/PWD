@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppFrame from "./components/AppFrame";
+import RotaProtegida from "./components/RotaProtegida";
 import PassageirosLista from "./screens/PassageirosLista";
 import CadastroPassageiro from "./screens/CadastroPassageiro";
 import ReservaVinculada from "./screens/ReservaVinculada";
@@ -8,6 +9,8 @@ import AgendaEmbarque from "./screens/AgendaEmbarque";
 import ConfiguracoesIntegracoes from "./screens/ConfiguracoesIntegracoes";
 import ConversaCliente from "./screens/ConversaCliente";
 import EmConstrucao from "./screens/EmConstrucao";
+import Login from "./screens/Login";
+import SignInDemo from "./screens/SignInDemo";
 
 // Seis telas do mockup "PWD Passageiro", portadas para componentes React.
 // Rotas espelham o menu lateral (Passageiros / Vendas / Agenda / Configurações);
@@ -17,18 +20,22 @@ export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
-        <Route element={<AppFrame />}>
-          <Route index element={<Navigate to="/passageiros" replace />} />
-          <Route path="passageiros" element={<PassageirosLista />} />
-          <Route path="passageiros/novo" element={<CadastroPassageiro />} />
-          <Route path="passageiros/:id/reserva" element={<ReservaVinculada />} />
-          <Route path="grupos" element={<EmConstrucao titulo="Grupos / Excursões" crumb="Grupos / Excursões" />} />
-          <Route path="clientes" element={<EmConstrucao titulo="Clientes" crumb="Clientes" />} />
-          <Route path="vendas" element={<FunilVendas />} />
-          <Route path="vendas/:id/conversa" element={<ConversaCliente />} />
-          <Route path="reservas" element={<EmConstrucao titulo="Reservas" crumb="Reservas" />} />
-          <Route path="agenda" element={<AgendaEmbarque />} />
-          <Route path="configuracoes" element={<ConfiguracoesIntegracoes />} />
+        <Route path="login" element={<Login />} />
+        <Route path="sign-in-demo" element={<SignInDemo />} />
+        <Route element={<RotaProtegida />}>
+          <Route element={<AppFrame />}>
+            <Route index element={<Navigate to="/passageiros" replace />} />
+            <Route path="passageiros" element={<PassageirosLista />} />
+            <Route path="passageiros/novo" element={<CadastroPassageiro />} />
+            <Route path="passageiros/:id/reserva" element={<ReservaVinculada />} />
+            <Route path="grupos" element={<EmConstrucao titulo="Grupos / Excursões" crumb="Grupos / Excursões" />} />
+            <Route path="clientes" element={<EmConstrucao titulo="Clientes" crumb="Clientes" />} />
+            <Route path="vendas" element={<FunilVendas />} />
+            <Route path="vendas/:id/conversa" element={<ConversaCliente />} />
+            <Route path="reservas" element={<EmConstrucao titulo="Reservas" crumb="Reservas" />} />
+            <Route path="agenda" element={<AgendaEmbarque />} />
+            <Route path="configuracoes" element={<ConfiguracoesIntegracoes />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>
