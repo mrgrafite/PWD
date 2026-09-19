@@ -3,12 +3,12 @@
    Design tokens e estilos globais (baseado no mockup "PWD Passageiro")
    ========================================================================== */
 
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap');
 /* Identidade visual ALI Tecnologia (reference_ali_identidade_visual) — usada
    nas telas já migradas (login, mockups de validação); resto do app segue
    IBM Plex Sans até a migração completa ser confirmada. */
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Newsreader:ital,wght@1,400;1,500&display=swap');
+@import "tailwindcss";
 
 :root {
   --ali-petrol-green: #315D59;
